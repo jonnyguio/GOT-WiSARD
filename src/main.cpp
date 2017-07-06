@@ -8,7 +8,7 @@
 #include <mutex>
 #include <chrono>
 
-#define DEBUG 0
+#define DEBUG 1
 
 template<typename TimeT = std::chrono::milliseconds>
 struct measure
@@ -28,7 +28,7 @@ const char
     *trainLabelsFilename = "./dados/labels/labels-treino.txt", 
     *trainWordRetinaFilename = "./dados/entradasParaRNSP/entradaTreinoPalavras.txt", 
     *trainTagRetinaFilename = "./dados/entradasParaRNSP/entradaTreinoTag.txt", 
-    *testLabelsFilename = "./dados/labels/labels-test.txt",
+    *testLabelsFilename = "./dados/labels/labels-teste.txt",
     *testWordRetinaFilename = "./dados/entradasParaRNSP/entradaTestePalavra.txt",
     *testTagRetinaFilename = "./dados/entradasParaRNSP/entradaTesteTag.txt";
 
@@ -140,28 +140,29 @@ void parallel() {
 
 void prepareDataWiSARD(const char *dataFilename, const char *labelFilename, std::vector<std::vector<int>> &dataVec, std::vector<std::string> &labelVec, bool train) {
     int index, size = (train) ? trainSize : testSize;
+    char temp;
     std::ifstream dataFile(dataFilename), labelFile(labelFilename);
 
     dataVec.resize(size, std::vector<int>(retinaLength));
     labelVec.resize(size);
-    for (int i = 0; i < size; i++) {
-        for (int j = 0; j < retinaLength; j++) {
+    for (int i = 0; i < size; ++i) {
+        for (int j = 0; j < retinaLength; ++j) {
             dataFile.read((char *) &index, sizeof(char));
             dataVec[i][j] = index - 48;
-            std::cout << "dataVec[" << i << "][" << j << "] = " << dataVec[i][j] << std::endl;
+            // std::cout << "dataVec[" << i << "][" << j << "] = " << dataVec[i][j] << std::endl;
             dataFile.read((char *) &index, sizeof(char));
             dataFile.read((char *) &index, sizeof(char));
         }
     }
-    std::cout << "ué" << std::endl;
-    for (int i = 0; i < size; i++) {
-            labelFile.read((char *) &index, sizeof(char));
-            labelFile.read((char *) &index, sizeof(char));
-            labelVec[i] = std::to_string(index - 48);
-            std::cout << "labelVec[" << i << "] = " << labelVec[i] << std::endl;
-            labelFile.read((char *) &index, sizeof(char));
-            labelFile.read((char *) &index, sizeof(char));
-            labelFile.read((char *) &index, sizeof(char));
+    // std::cout << "ué" << std::endl;
+    for (int i = 0; i < size; ++i) {
+            labelFile.read((char *) &temp, sizeof(char));
+            labelFile.read((char *) &temp, sizeof(char));
+            labelVec[i] = std::to_string((int) temp - 48);
+            // std::cout << "labelVec[" << i << "] = " << labelVec[i] << " - " << temp << " - " << temp - 48 << std::endl;
+            labelFile.read((char *) &temp, sizeof(char));
+            labelFile.read((char *) &temp, sizeof(char));
+            labelFile.read((char *) &temp, sizeof(char));
     }
 }
 
@@ -171,23 +172,24 @@ void sequential() {
     std::vector<std::string> trainLabels, testLabels, result;
 
     prepareDataWiSARD(trainWordRetinaFilename, trainLabelsFilename, trainWord, trainLabels, true);
-    // readLabelsMNIST(trainLabelsFilename, trainingLabels);
-    // readImagesMNIST(trainImagesFilename, trainingImages);
-    // readLabelsMNIST(testLabelsFilename, testLabels);
-    // readImagesMNIST(testImagesFilename, testImages);
+    prepareDataWiSARD(testWordRetinaFilename, testLabelsFilename, testWord, testLabels, false);
 
-    // if (DEBUG) std::cout << "Preparing it to WiSARD..." << std::endl;
+    WiSARD *wisardWord = new WiSARD(retinaLength, numBitsAddrs, bleaching, confidenceThreshold, defaultBleaching);
 
-    // prepareToWisard(trainingImages, trainingImagesExtended);
-    // prepareToWisard(testImages, testImagesExtended);
-    
-    // WiSARD *w = new WiSARD((extended) ? trainingImagesExtended[0].size() : trainingImages[0].size(), numBitsAddrs, bleaching, confidenceThreshold, defaultBleaching);
+    if (DEBUG) std::cout << "Training..." << std::endl;
+    wisardWord->fit(trainWord, trainLabels);
 
-    // if (DEBUG) std::cout << "Training..." << std::endl;
-    // w->fit((extended) ? trainingImagesExtended : trainingImages, trainingLabels);
+    if (DEBUG) std::cout << "Prediction..." << std::endl;
+    result = wisardWord->predict(testWord);
 
-    // if (DEBUG) std::cout << "Prediction..." << std::endl;
-    // result = w->predict((extended) ? testImagesExtended : testImages);
+    if (DEBUG) std::cout << "Rights: ";
+    for (int i = 0; i < testLabels.size(); ++i) {
+        std::cout << testLabels[i] << " - " << result[i] << std::endl;
+        if (testLabels[i] == result[i]) {
+            count++;
+        }
+    }    
+    std::cout << count << std::endl;
 
     // if (DEBUG) std::cout << "Rights: ";
     // for (int i = 0; i < testLabels.size(); i++) {
