@@ -34,7 +34,6 @@ const char
     *testWordRetinaFilename = "./dados/entradasParaRNSP/entradaTestePalavra.txt",
     *testTagRetinaFilename = "./dados/entradasParaRNSP/entradaTesteTag.txt";
 
-const int retinaLength = 1009;
 const int trainSize = 200;
 const int testSize = 47;
 int numThreads = 4;
@@ -140,7 +139,7 @@ void parallel() {
 //     delete w;
 }
 
-void prepareDataWiSARD(const char *dataFilename, const char *labelFilename, std::vector<std::vector<int>> &dataVec, std::vector<std::string> &labelVec, bool train) {
+void prepareDataWiSARD(int retinaLength, const char *dataFilename, const char *labelFilename, std::vector<std::vector<int>> &dataVec, std::vector<std::string> &labelVec, bool train) {
     int index, size = (train) ? trainSize : testSize;
     char temp;
     std::ifstream dataFile(dataFilename), labelFile(labelFilename);
@@ -176,13 +175,13 @@ void sequential() {
     std::vector<std::vector<int>> trainWord, testWord, trainTag, testTag;
     std::vector<std::string> trainWordLabels, trainTagLabels, testWordLabels, testTagLabels, resultTag, resultWord;
 
-    prepareDataWiSARD(trainWordRetinaFilename, trainLabelsFilename, trainWord, trainWordLabels, true);
-    prepareDataWiSARD(trainTagRetinaFilename, trainLabelsFilename, trainTag, trainTagLabels, true);
-    prepareDataWiSARD(testWordRetinaFilename, testLabelsFilename, testWord, testWordLabels, false);
-    prepareDataWiSARD(testTagRetinaFilename, testLabelsFilename, testTag, testTagLabels, false);
+    prepareDataWiSARD(1009, trainWordRetinaFilename, trainLabelsFilename, trainWord, trainWordLabels, true);
+    prepareDataWiSARD(29, trainTagRetinaFilename, trainLabelsFilename, trainTag, trainTagLabels, true);
+    prepareDataWiSARD(1009, testWordRetinaFilename, testLabelsFilename, testWord, testWordLabels, false);
+    prepareDataWiSARD(29, testTagRetinaFilename, testLabelsFilename, testTag, testTagLabels, false);
 
-    WiSARD *wisardWord = new WiSARD(retinaLength, numBitsAddrs, bleaching, confidenceThreshold, defaultBleaching);
-    WiSARD *wisardTag = new WiSARD(retinaLength, numBitsAddrs, bleaching, confidenceThreshold, defaultBleaching);
+    WiSARD *wisardWord = new WiSARD(1009, numBitsAddrs, bleaching, confidenceThreshold, defaultBleaching);
+    WiSARD *wisardTag = new WiSARD(29, numBitsAddrs, bleaching, confidenceThreshold, defaultBleaching);
 
     if (DEBUG) std::cout << "Training..." << std::endl;
     wisardWord->fit(trainWord, trainWordLabels);
