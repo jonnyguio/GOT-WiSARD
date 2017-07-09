@@ -8,7 +8,7 @@
 #include <mutex>
 #include <chrono>
 
-#define DEBUG 1
+#define DEBUG 0
 
 template<typename TimeT = std::chrono::milliseconds>
 struct measure
@@ -25,15 +25,17 @@ struct measure
 };
 
 const char 
-    *trainLabelsFilename = "./dados/labels/labels-treino.txt", 
+    *trainLabelsFilename = "./dados/labels/labels-treino-balanceadas.txt", 
     *trainWordRetinaFilename = "./dados/entradasParaRNSP/entradaTreinoPalavras.txt", 
-    *trainTagRetinaFilename = "./dados/entradasParaRNSP/entradaTreinoTag.txt", 
+    *trainTagRetinaFilename = "./dados/entradasParaRNSP/entradaTreinoTags.txt", 
+    // *trainWordRetinaFilename = "./dados/entradaTreinoPalavraBalanceada.txt", 
+    // *trainTagRetinaFilename = "./dados/entradaTreinoTagBalanceada.txt", 
     *testLabelsFilename = "./dados/labels/labels-teste.txt",
     *testWordRetinaFilename = "./dados/entradasParaRNSP/entradaTestePalavra.txt",
     *testTagRetinaFilename = "./dados/entradasParaRNSP/entradaTesteTag.txt";
 
 const int retinaLength = 1009;
-const int trainSize = 414;
+const int trainSize = 200;
 const int testSize = 47;
 int numThreads = 4;
 int numBitsAddrs = 16;
@@ -147,59 +149,67 @@ void prepareDataWiSARD(const char *dataFilename, const char *labelFilename, std:
     labelVec.resize(size);
     for (int i = 0; i < size; ++i) {
         for (int j = 0; j < retinaLength; ++j) {
-            dataFile.read((char *) &index, sizeof(char));
-            dataVec[i][j] = index - 48;
+            dataFile.read((char *) &temp, sizeof(char));
+            dataVec[i][j] = temp - 48;
+            // std::cout << "temp " << temp << std::endl;
             // std::cout << "dataVec[" << i << "][" << j << "] = " << dataVec[i][j] << std::endl;
-            dataFile.read((char *) &index, sizeof(char));
-            dataFile.read((char *) &index, sizeof(char));
+            dataFile.read((char *) &temp, sizeof(char));
+            // std::cout << "temp " << temp << std::endl;
+            dataFile.read((char *) &temp, sizeof(char));
+            // std::cout << "temp " << temp << std::endl;
         }
     }
     // std::cout << "ué" << std::endl;
     for (int i = 0; i < size; ++i) {
-            labelFile.read((char *) &temp, sizeof(char));
-            labelFile.read((char *) &temp, sizeof(char));
-            labelVec[i] = std::to_string((int) temp - 48);
-            // std::cout << "labelVec[" << i << "] = " << labelVec[i] << " - " << temp << " - " << temp - 48 << std::endl;
-            labelFile.read((char *) &temp, sizeof(char));
-            labelFile.read((char *) &temp, sizeof(char));
-            labelFile.read((char *) &temp, sizeof(char));
+        labelFile.read((char *) &temp, sizeof(char));
+        labelFile.read((char *) &temp, sizeof(char));
+        labelVec[i] = std::to_string((int) temp - 48);
+        // std::cout << "labelVec[" << i << "] = " << labelVec[i] << " - " << temp << " - " << temp - 48 << std::endl;
+        labelFile.read((char *) &temp, sizeof(char));
+        labelFile.read((char *) &temp, sizeof(char));
+        labelFile.read((char *) &temp, sizeof(char));
     }
 }
 
 void sequential() {
     int count = 0;
     std::vector<std::vector<int>> trainWord, testWord, trainTag, testTag;
-    std::vector<std::string> trainLabels, testLabels, result;
+    std::vector<std::string> trainWordLabels, trainTagLabels, testWordLabels, testTagLabels, resultTag, resultWord;
 
-    prepareDataWiSARD(trainWordRetinaFilename, trainLabelsFilename, trainWord, trainLabels, true);
-    prepareDataWiSARD(testWordRetinaFilename, testLabelsFilename, testWord, testLabels, false);
+    prepareDataWiSARD(trainWordRetinaFilename, trainLabelsFilename, trainWord, trainWordLabels, true);
+    prepareDataWiSARD(trainTagRetinaFilename, trainLabelsFilename, trainTag, trainTagLabels, true);
+    prepareDataWiSARD(testWordRetinaFilename, testLabelsFilename, testWord, testWordLabels, false);
+    prepareDataWiSARD(testTagRetinaFilename, testLabelsFilename, testTag, testTagLabels, false);
 
     WiSARD *wisardWord = new WiSARD(retinaLength, numBitsAddrs, bleaching, confidenceThreshold, defaultBleaching);
+    WiSARD *wisardTag = new WiSARD(retinaLength, numBitsAddrs, bleaching, confidenceThreshold, defaultBleaching);
 
     if (DEBUG) std::cout << "Training..." << std::endl;
-    wisardWord->fit(trainWord, trainLabels);
+    wisardWord->fit(trainWord, trainWordLabels);
+    wisardTag->fit(trainWord, trainTagLabels);
 
     if (DEBUG) std::cout << "Prediction..." << std::endl;
-    result = wisardWord->predict(testWord);
+    resultWord = wisardWord->predict(testWord);
+    resultTag = wisardTag->predict(testTag);
 
-    if (DEBUG) std::cout << "Rights: ";
-    for (int i = 0; i < testLabels.size(); ++i) {
-        std::cout << testLabels[i] << " - " << result[i] << std::endl;
-        if (testLabels[i] == result[i]) {
+    if (DEBUG) std::cout << "Rights words: ";
+    for (int i = 0; i < testWordLabels.size(); ++i) {
+        // std::cout << testWordLabels[i] << " - " << resultWord[i] << std::endl;
+        if (testWordLabels[i] == resultWord[i]) {
             count++;
         }
     }    
-    std::cout << count << std::endl;
-
-    // if (DEBUG) std::cout << "Rights: ";
-    // for (int i = 0; i < testLabels.size(); i++) {
-    //     if (testLabels[i] == result[i]) {
-    //         count++;
-    //     }
-    // }
-    // std::cout << count << std::endl;
-
-    // delete w;
+    std::cout << count << std::endl;//<< " - " << (float) count / (float) testSize << std::endl;
+    
+    count = 0;
+    if (DEBUG) std::cout << "Rights tags: ";
+    for (int i = 0; i < testTagLabels.size(); ++i) {
+        // std::cout << testTagLabels[i] << " - " << resultTag[i] << std::endl;
+        if (testTagLabels[i] == resultTag[i]) {
+            count++;
+        }
+    }    
+    std::cout << count << std::endl;// " - " << (float) count / (float) testSize << std::endl;
 }
 
 int main(int argc, char *argv[]) {
@@ -218,9 +228,6 @@ int main(int argc, char *argv[]) {
                     confidenceThreshold = atof(argv[4]);
                     if (argc > 5 ) {
                         numThreads = atoi(argv[5]);
-                        if (argc > 6) {
-                            threshold = atoi(argv[6]);
-                        }
                     }
                 }
             }
@@ -239,7 +246,7 @@ int main(int argc, char *argv[]) {
         }
     }
     else {
-        std::cout << "usage: " << argv[0] << " <0 = sequential, 1 = parallel> [<numBitsAddrs> <bleaching, 0 = false, >1 = size of bleaching> <confidenceThreshold> <numThreads> <threshold>]" << std::endl;
+        std::cout << "usage: " << argv[0] << " <0 = sequential, 1 = parallel> [<numBitsAddrs> <bleaching, 0 = false, >1 = size of bleaching> <confidenceThreshold> <numThreads>]" << std::endl;
     }
     return 0;
 }

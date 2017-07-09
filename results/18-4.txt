@@ -1,0 +1,3 @@
+18
+14
+27 miliseconds.
